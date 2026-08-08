@@ -290,13 +290,94 @@
   .armor.left::after{left:20px}
   .armor.right::after{right:20px}
 
+
+  .body .scanline{
+    position:absolute;
+    left:7%;
+    right:7%;
+    height:2px;
+    top:18px;
+    background:linear-gradient(90deg,transparent,var(--cyan),transparent);
+    opacity:0;
+    box-shadow:0 0 12px rgba(0,234,255,.55);
+    animation:panelScan 5.8s linear infinite;
+    z-index:3;
+  }
+  @keyframes panelScan{
+    0%{transform:translateY(0);opacity:0}
+    8%{opacity:.55}
+    45%{opacity:.18}
+    100%{transform:translateY(120px);opacity:0}
+  }
+
+  .micro-leds{
+    position:absolute;
+    left:50%;
+    bottom:13px;
+    transform:translateX(-50%);
+    display:flex;
+    gap:10px;
+    z-index:4;
+  }
+  .micro-leds span{
+    width:5px;
+    height:5px;
+    border-radius:50%;
+    background:var(--cyan);
+    opacity:.22;
+    box-shadow:0 0 8px rgba(0,234,255,.5);
+    animation:ledBlink 2.8s ease-in-out infinite;
+  }
+  .micro-leds span:nth-child(2){animation-delay:-.7s}
+  .micro-leds span:nth-child(3){animation-delay:-1.4s}
+  .micro-leds span:nth-child(4){animation-delay:-2.1s}
+  @keyframes ledBlink{
+    0%,100%{opacity:.15;transform:scale(.85)}
+    50%{opacity:.95;transform:scale(1.15)}
+  }
+
+  .cornerPulse{
+    position:absolute;
+    width:38px;
+    height:2px;
+    top:50%;
+    margin-top:-1px;
+    background:var(--cyan);
+    opacity:.18;
+    box-shadow:0 0 10px rgba(0,234,255,.6);
+    animation:cornerPulse 3.4s ease-in-out infinite;
+    z-index:4;
+  }
+  .cornerPulse.left{left:30px}
+  .cornerPulse.right{right:30px;animation-delay:-1.7s}
+  @keyframes cornerPulse{
+    0%,100%{opacity:.12;transform:scaleX(.45)}
+    50%{opacity:.9;transform:scaleX(1)}
+  }
+
+  .label::after{
+    content:"";
+    display:inline-block;
+    width:32px;
+    height:2px;
+    margin-left:10px;
+    vertical-align:middle;
+    background:var(--cyan);
+    box-shadow:0 0 8px rgba(0,234,255,.7);
+    animation:statusLine 2s ease-in-out infinite;
+  }
+  @keyframes statusLine{
+    0%,100%{opacity:.2;transform:scaleX(.4)}
+    50%{opacity:1;transform:scaleX(1)}
+  }
+
 </style>
 </head>
 <body>
   <div id="overlay">
 
     <div id="topHud" class="hud shutterAnim">
-      <div class="body"><div class="armor left"></div><div class="armor right"></div>
+      <div class="body"><div class="armor left"></div><div class="armor right"></div><div class="scanline"></div><div class="cornerPulse left"></div><div class="cornerPulse right"></div><div class="micro-leds"><span></span><span></span><span></span><span></span></div>
         <div class="rail top"></div>
         <div class="rail bottom"></div>
         <div class="bolt b1"></div><div class="bolt b2"></div>
@@ -319,7 +400,7 @@
     </div>
 
     <div id="bottomHud" class="hud shutterAnim" style="animation-delay:-5.5s">
-      <div class="body"><div class="armor left"></div><div class="armor right"></div>
+      <div class="body"><div class="armor left"></div><div class="armor right"></div><div class="scanline"></div><div class="cornerPulse left"></div><div class="cornerPulse right"></div><div class="micro-leds"><span></span><span></span><span></span><span></span></div>
         <div class="rail top"></div>
         <div class="rail bottom"></div>
         <div class="bolt b1"></div><div class="bolt b2"></div>
