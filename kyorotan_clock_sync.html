@@ -1,0 +1,37 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><style>
+:root{--cyan:#00eaff;--panel:rgba(4,10,18,.72);--line:rgba(120,230,255,.52);--text:#eafcff;--muted:rgba(225,249,255,.66)}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent;font-family:"Segoe UI","Yu Gothic UI",Arial,sans-serif}
+#overlay{position:relative;width:1080px;height:1920px;overflow:hidden;background:transparent;color:var(--text)}
+.hud{position:absolute;left:80px;top:120px;width:920px;height:170px;pointer-events:none;filter:drop-shadow(0 0 18px rgba(0,234,255,.28))}
+.body{position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.07),transparent 25%),linear-gradient(90deg,rgba(9,22,34,.78),rgba(2,8,15,.90),rgba(9,22,34,.78));border:2px solid var(--line);clip-path:polygon(34px 0,calc(100% - 34px) 0,100% 34px,100% calc(100% - 34px),calc(100% - 34px) 100%,34px 100%,0 calc(100% - 34px),0 34px);overflow:hidden}
+.rail{position:absolute;left:45px;right:45px;height:2px;background:linear-gradient(90deg,transparent,var(--cyan),transparent);opacity:.48}.rail.top{top:10px}.rail.bottom{bottom:10px}
+.center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;letter-spacing:.16em}
+.label{font-size:22px;color:var(--muted);margin-bottom:5px;letter-spacing:.24em}.game{font-size:52px;font-weight:700;text-shadow:0 0 10px rgba(0,234,255,.55),0 0 24px rgba(0,234,255,.25)}
+.sub{font-size:18px;margin-top:8px;color:var(--cyan);letter-spacing:.28em;opacity:.78}
+.clock{font-size:78px;font-weight:600;letter-spacing:.18em;text-shadow:0 0 12px rgba(0,234,255,.58),0 0 28px rgba(0,234,255,.28);font-variant-numeric:tabular-nums}
+.date{font-size:19px;color:var(--muted);margin-top:11px;letter-spacing:.22em}
+.liveDot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:10px;background:var(--cyan);box-shadow:0 0 12px var(--cyan);animation:pulse 1.8s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.35;transform:scale(.8)}50%{opacity:1;transform:scale(1.25)}}
+.shutterAnim{animation:shutter 11s ease-in-out infinite}
+@keyframes shutter{0%,72%,100%{transform:translateY(0)}76%{transform:translateY(12px)}79%{transform:translateY(4px)}82%{transform:translateY(17px)}86%{transform:translateY(0)}}
+.scanline{position:absolute;left:7%;right:7%;height:2px;top:18px;background:linear-gradient(90deg,transparent,var(--cyan),transparent);opacity:0;box-shadow:0 0 12px rgba(0,234,255,.55);animation:panelScan 5.8s linear infinite}
+@keyframes panelScan{0%{transform:translateY(0);opacity:0}8%{opacity:.55}45%{opacity:.18}100%{transform:translateY(120px);opacity:0}}
+</style></head>
+<body><div id="overlay"><div class="hud shutterAnim"><div class="body"><div class="scanline"></div><div class="rail top"></div><div class="rail bottom"></div><div class="center"><div id="clock" class="clock">00:00:00</div><div id="date" class="date">0000.00.00 // JST</div></div></div></div></div>
+<script>
+
+(function(){
+ const PERIOD=11000;
+ const phase=-(Date.now()%PERIOD);
+ document.querySelectorAll(".shutterAnim").forEach(el=>el.style.animationDelay=phase+"ms");
+})();
+
+const p=n=>String(n).padStart(2,"0");
+function tick(){
+ const a=new Intl.DateTimeFormat("ja-JP",{timeZone:"Asia/Tokyo",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"}).formatToParts(new Date());
+ const g=t=>a.find(x=>x.type===t)?.value??"";
+ document.getElementById("clock").textContent=`${g("hour")}:${g("minute")}:${g("second")}`;
+ document.getElementById("date").textContent=`${g("year")}.${g("month")}.${g("day")} // JST`;
+}
+tick();setInterval(tick,1000);
+</script></body></html>
