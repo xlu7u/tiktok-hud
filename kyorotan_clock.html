@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KYOROTAN CLOCK HUD</title>
+<style>
+  :root{
+    --cyan:#00eaff;
+    --cyan-soft:rgba(0,234,255,.28);
+    --panel:rgba(4,10,18,.72);
+    --panel2:rgba(8,18,30,.56);
+    --line:rgba(120,230,255,.42);
+    --text:#eafcff;
+    --muted:rgba(225,249,255,.66);
+  }
+
+  html,body{
+    margin:0;
+    width:100%;
+    height:100%;
+    overflow:hidden;
+    background:transparent;
+    font-family: "Segoe UI", "Yu Gothic UI", "Hiragino Kaku Gothic ProN", Arial, sans-serif;
+  }
+
+  /* 1080 x 1920 の縦配信キャンバス */
+  #overlay{
+    position:relative;
+    width:1080px;
+    height:1920px;
+    overflow:hidden;
+    background:transparent;
+    color:var(--text);
+  }
+
+  .hud{
+    position:absolute;
+    left:80px;
+    width:920px;
+    height:170px;
+    pointer-events:none;
+    filter: drop-shadow(0 0 18px rgba(0,234,255,.28));
+  }
+
+  /* TikTok上部UIを避ける位置 */
+  #topHud{ top:490px; }
+
+  /* コメント欄に入りすぎない位置 */
+  #bottomHud{ top:120px; }
+
+  .body{
+    position:absolute;
+    inset:0;
+    background:
+      linear-gradient(180deg,rgba(255,255,255,.07),transparent 25%),
+      linear-gradient(135deg,transparent 0 8%,rgba(0,234,255,.06) 8% 10%,transparent 10% 90%,rgba(0,234,255,.06) 90% 92%,transparent 92%),
+      linear-gradient(90deg,rgba(9,22,34,.78),rgba(2,8,15,.90),rgba(9,22,34,.78));
+    border:2px solid rgba(120,230,255,.52);
+    clip-path:polygon(
+      34px 0, calc(100% - 34px) 0,
+      100% 34px, 100% calc(100% - 34px),
+      calc(100% - 34px) 100%, 34px 100%,
+      0 calc(100% - 34px), 0 34px
+    );
+    overflow:hidden;
+  }
+
+  .body::before,
+  .body::after{
+    content:"";
+    position:absolute;
+    top:18px;
+    bottom:18px;
+    width:160px;
+    opacity:.58;
+    background:
+      linear-gradient(90deg,transparent,var(--cyan-soft),transparent);
+  }
+  .body::before{ left:-130px; animation:sweep 6.2s linear infinite; }
+  .body::after{ right:-130px; animation:sweep2 7.6s linear infinite; }
+
+  @keyframes sweep{
+    0%{ transform:translateX(0); opacity:0; }
+    12%{opacity:.7}
+    55%{opacity:.35}
+    100%{ transform:translateX(1160px); opacity:0; }
+  }
+  @keyframes sweep2{
+    0%{ transform:translateX(0); opacity:0; }
+    15%{opacity:.5}
+    100%{ transform:translateX(-1160px); opacity:0; }
+  }
+
+  .rail{
+    position:absolute;
+    left:45px;
+    right:45px;
+    height:2px;
+    background:linear-gradient(90deg,transparent,var(--cyan),transparent);
+    opacity:.48;
+  }
+  .rail.top{top:10px}
+  .rail.bottom{bottom:10px}
+
+  .bolt{
+    position:absolute;
+    width:10px;height:10px;
+    border:1px solid rgba(120,230,255,.72);
+    transform:rotate(45deg);
+    background:rgba(0,234,255,.10);
+  }
+  .b1{left:29px;top:29px}.b2{right:29px;top:29px}
+  .b3{left:29px;bottom:29px}.b4{right:29px;bottom:29px}
+
+  .slot{
+    position:absolute;
+    width:86px;height:7px;
+    top:20px;
+    border:1px solid rgba(0,234,255,.40);
+    background:rgba(0,234,255,.09);
+  }
+  .slot.left{left:76px}
+  .slot.right{right:76px}
+
+  .center{
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex-direction:column;
+    text-align:center;
+    letter-spacing:.16em;
+  }
+
+  .label{
+    font-size:22px;
+    color:var(--muted);
+    margin-bottom:5px;
+    letter-spacing:.24em;
+  }
+
+  .game{
+    font-size:52px;
+    line-height:1;
+    font-weight:700;
+    color:var(--text);
+    text-shadow:0 0 10px rgba(0,234,255,.55), 0 0 24px rgba(0,234,255,.25);
+  }
+
+  .sub{
+    font-size:18px;
+    margin-top:8px;
+    color:var(--cyan);
+    letter-spacing:.28em;
+    opacity:.78;
+  }
+
+  .liveDot{
+    display:inline-block;
+    width:10px;height:10px;
+    border-radius:50%;
+    margin-right:10px;
+    background:var(--cyan);
+    box-shadow:0 0 12px var(--cyan);
+    animation:pulse 1.8s ease-in-out infinite;
+  }
+  @keyframes pulse{
+    0%,100%{opacity:.35;transform:scale(.8)}
+    50%{opacity:1;transform:scale(1.25)}
+  }
+
+  .clock{
+    font-size:78px;
+    line-height:1;
+    font-weight:600;
+    letter-spacing:.18em;
+    color:var(--text);
+    text-shadow:0 0 12px rgba(0,234,255,.58), 0 0 28px rgba(0,234,255,.28);
+    font-variant-numeric:tabular-nums;
+  }
+  .date{
+    font-size:19px;
+    color:var(--muted);
+    margin-top:11px;
+    letter-spacing:.22em;
+  }
+
+  .tiny{
+    position:absolute;
+    bottom:22px;
+    font-size:13px;
+    color:rgba(220,250,255,.42);
+    letter-spacing:.18em;
+  }
+  .tiny.left{left:78px}.tiny.right{right:78px}
+
+  .signal{
+    position:absolute;
+    right:75px;
+    top:61px;
+    display:flex;
+    align-items:flex-end;
+    gap:5px;
+    height:28px;
+  }
+  .signal span{
+    width:5px;
+    background:var(--cyan);
+    opacity:.34;
+    animation:eq 1.35s ease-in-out infinite alternate;
+  }
+  .signal span:nth-child(1){height:8px;animation-delay:-.2s}
+  .signal span:nth-child(2){height:14px;animation-delay:-.7s}
+  .signal span:nth-child(3){height:22px;animation-delay:-.4s}
+  .signal span:nth-child(4){height:28px;animation-delay:-1s}
+  @keyframes eq{
+    from{transform:scaleY(.45);opacity:.25}
+    to{transform:scaleY(1);opacity:.88}
+  }
+
+  /* たまにカシャッと動く */
+  .shutterAnim{
+    animation:shutter 11s ease-in-out infinite;
+  }
+  @keyframes shutter{
+    0%,72%,100%{transform:translateY(0)}
+    76%{transform:translateY(12px)}
+    79%{transform:translateY(4px)}
+    82%{transform:translateY(17px)}
+    86%{transform:translateY(0)}
+  }
+
+  /* 一瞬だけシステム同期表示 */
+  .sync{
+    position:absolute;
+    left:50%;
+    top:50%;
+    transform:translate(-50%,-50%);
+    font-size:14px;
+    letter-spacing:.26em;
+    padding:6px 14px;
+    border:1px solid rgba(0,234,255,.5);
+    color:var(--cyan);
+    background:rgba(2,8,15,.72);
+    opacity:0;
+    animation:sync 11s linear infinite;
+  }
+  @keyframes sync{
+    0%,73%,100%{opacity:0}
+    76%{opacity:.75}
+    78%{opacity:.16}
+    81%{opacity:.95}
+    86%{opacity:0}
+  }
+
+  .armor{
+    position:absolute;
+    top:0;
+    bottom:0;
+    width:145px;
+    z-index:2;
+    opacity:.78;
+    background:
+      linear-gradient(135deg,rgba(0,234,255,.12),transparent 38%),
+      linear-gradient(180deg,rgba(255,255,255,.05),rgba(0,0,0,.12));
+    border-color:rgba(120,230,255,.36);
+  }
+  .armor.left{
+    left:0;
+    border-right:1px solid;
+    clip-path:polygon(0 0,100% 0,74% 50%,100% 100%,0 100%);
+  }
+  .armor.right{
+    right:0;
+    border-left:1px solid;
+    clip-path:polygon(0 0,100% 0,100% 100%,0 100%,26% 50%);
+  }
+  .armor::after{
+    content:"";
+    position:absolute;
+    top:50%;
+    width:52px;
+    height:2px;
+    background:var(--cyan);
+    opacity:.65;
+    box-shadow:0 0 12px rgba(0,234,255,.75);
+  }
+  .armor.left::after{left:20px}
+  .armor.right::after{right:20px}
+
+
+  .body .scanline{
+    position:absolute;
+    left:7%;
+    right:7%;
+    height:2px;
+    top:18px;
+    background:linear-gradient(90deg,transparent,var(--cyan),transparent);
+    opacity:0;
+    box-shadow:0 0 12px rgba(0,234,255,.55);
+    animation:panelScan 5.8s linear infinite;
+    z-index:3;
+  }
+  @keyframes panelScan{
+    0%{transform:translateY(0);opacity:0}
+    8%{opacity:.55}
+    45%{opacity:.18}
+    100%{transform:translateY(120px);opacity:0}
+  }
+
+  .micro-leds{
+    position:absolute;
+    left:50%;
+    bottom:13px;
+    transform:translateX(-50%);
+    display:flex;
+    gap:10px;
+    z-index:4;
+  }
+  .micro-leds span{
+    width:5px;
+    height:5px;
+    border-radius:50%;
+    background:var(--cyan);
+    opacity:.22;
+    box-shadow:0 0 8px rgba(0,234,255,.5);
+    animation:ledBlink 2.8s ease-in-out infinite;
+  }
+  .micro-leds span:nth-child(2){animation-delay:-.7s}
+  .micro-leds span:nth-child(3){animation-delay:-1.4s}
+  .micro-leds span:nth-child(4){animation-delay:-2.1s}
+  @keyframes ledBlink{
+    0%,100%{opacity:.15;transform:scale(.85)}
+    50%{opacity:.95;transform:scale(1.15)}
+  }
+
+  .cornerPulse{
+    position:absolute;
+    width:38px;
+    height:2px;
+    top:50%;
+    margin-top:-1px;
+    background:var(--cyan);
+    opacity:.18;
+    box-shadow:0 0 10px rgba(0,234,255,.6);
+    animation:cornerPulse 3.4s ease-in-out infinite;
+    z-index:4;
+  }
+  .cornerPulse.left{left:30px}
+  .cornerPulse.right{right:30px;animation-delay:-1.7s}
+  @keyframes cornerPulse{
+    0%,100%{opacity:.12;transform:scaleX(.45)}
+    50%{opacity:.9;transform:scaleX(1)}
+  }
+
+  .label::after{
+    content:"";
+    display:inline-block;
+    width:32px;
+    height:2px;
+    margin-left:10px;
+    vertical-align:middle;
+    background:var(--cyan);
+    box-shadow:0 0 8px rgba(0,234,255,.7);
+    animation:statusLine 2s ease-in-out infinite;
+  }
+  @keyframes statusLine{
+    0%,100%{opacity:.2;transform:scaleX(.4)}
+    50%{opacity:1;transform:scaleX(1)}
+  }
+
+</style></head>
+<body><div id="overlay"><div id="bottomHud" class="hud shutterAnim" style="animation-delay:-5.5s">
+      <div class="body"><div class="armor left"></div><div class="armor right"></div><div class="scanline"></div><div class="cornerPulse left"></div><div class="cornerPulse right"></div><div class="micro-leds"><span></span><span></span><span></span><span></span></div>
+        <div class="rail top"></div>
+        <div class="rail bottom"></div>
+        <div class="bolt b1"></div><div class="bolt b2"></div>
+        <div class="bolt b3"></div><div class="bolt b4"></div>
+        <div class="slot left"></div><div class="slot right"></div>
+
+        <div class="center">
+          <div id="clock" class="clock">00:00:00</div>
+          <div id="date" class="date">0000.00.00 // JST</div>
+        </div>
+
+        <div class="tiny left">LOCAL TIME</div>
+        <div class="tiny right">KYOROTAN // ONLINE</div>
+      </div>
+      <div class="sync" style="animation-delay:-5.5s">TIME SYNC</div>
+    </div></div>
+<script>
+const pad=n=>String(n).padStart(2,"0");
+function updateClock(){
+  const parts = new Intl.DateTimeFormat("ja-JP", {
+    timeZone:"Asia/Tokyo", year:"numeric", month:"2-digit", day:"2-digit",
+    hour:"2-digit", minute:"2-digit", second:"2-digit", hourCycle:"h23"
+  }).formatToParts(new Date());
+  const get=t=>parts.find(p=>p.type===t)?.value??"";
+  const c=document.getElementById("clock"), d=document.getElementById("date");
+  if(c)c.textContent=`${get("hour")}:${get("minute")}:${get("second")}`;
+  if(d)d.textContent=`${get("year")}.${get("month")}.${get("day")} // JST`;
+}
+updateClock(); setInterval(updateClock,1000);
+</script></body></html>
