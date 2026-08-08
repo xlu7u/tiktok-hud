@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KYOROTAN 自動いいね進捗</title>
+<style>
+*{box-sizing:border-box}
+html,body{
+  margin:0;width:100%;height:100%;overflow:hidden;background:transparent;
+  font-family:"Segoe UI","Yu Gothic UI","Meiryo",sans-serif;
+}
+body{display:flex;align-items:center;justify-content:center}
+.hud{
+  width:min(94vw,1000px);
+  padding:28px 38px 30px;
+  position:relative;
+  color:#eaffff;
+  background:linear-gradient(135deg,rgba(3,15,28,.92),rgba(8,10,34,.88));
+  border:2px solid rgba(70,230,255,.74);
+  clip-path:polygon(3% 0,97% 0,100% 20%,100% 80%,97% 100%,3% 100%,0 80%,0 20%);
+  box-shadow:inset 0 0 30px rgba(0,234,255,.09);
+}
+.hud:before,.hud:after{
+  content:"";position:absolute;top:0;width:35%;height:3px;box-shadow:0 0 15px currentColor;
+}
+.hud:before{left:8%;background:#00eaff;color:#00eaff}
+.hud:after{right:8%;background:#765cff;color:#765cff}
+.title{
+  text-align:center;font-size:30px;font-weight:800;letter-spacing:.08em;
+  text-shadow:0 0 12px rgba(0,234,255,.55);
+}
+.count{
+  margin-top:8px;text-align:center;font-size:46px;font-weight:900;
+  font-variant-numeric:tabular-nums;text-shadow:0 0 16px rgba(0,234,255,.75);
+}
+.bar-shell{
+  height:32px;margin-top:20px;padding:4px;border:1px solid rgba(130,240,255,.65);
+  background:rgba(0,0,0,.42);
+  clip-path:polygon(1.5% 0,98.5% 0,100% 50%,98.5% 100%,1.5% 100%,0 50%);
+}
+.bar{
+  height:100%;width:0%;
+  background:linear-gradient(90deg,#00eaff,#3f9cff,#765cff);
+  box-shadow:0 0 18px rgba(0,234,255,.75);
+  transition:width .25s ease;
+}
+.total{
+  margin-top:18px;text-align:center;font-size:27px;font-weight:700;
+  color:rgba(235,252,255,.9);letter-spacing:.05em;
+}
+.total span{font-size:31px;color:#fff;font-variant-numeric:tabular-nums}
+.status{
+  position:absolute;right:28px;bottom:12px;font-size:12px;letter-spacing:.08em;
+  color:rgba(230,252,255,.48)
+}
+.status.ok{color:rgba(80,255,200,.72)}
+.status.bad{color:rgba(255,120,120,.72)}
+.achieved{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  background:rgba(2,8,22,.95);font-size:46px;font-weight:900;letter-spacing:.06em;
+  color:#efffff;text-shadow:0 0 12px #00eaff,0 0 28px #765cff;
+  opacity:0;pointer-events:none;
+}
+.achieved.show{animation:flash 2.6s ease both}
+@keyframes flash{
+  0%{opacity:0;transform:scale(.94)}
+  12%,72%{opacity:1;transform:scale(1)}
+  100%{opacity:0;transform:scale(1.04)}
+}
+</style>
+</head>
+<body>
+<div class="hud">
+  <div class="title">❤️ 次の10,000いいねまで</div>
+  <div class="count"><span id="progress">0</span> / 10,000</div>
+  <div class="bar-shell"><div class="bar" id="bar"></div></div>
+  <div class="total">累計いいね　<span id="total">0</span></div>
+  <div class="status" id="status">接続中...</div>
+  <div class="achieved" id="achieved">✨ 10,000いいね達成！ ✨</div>
+</div>
+
+<script>
+let websocket = null;
+let totalLikes = Number(localStorage.getItem("kyorotan_auto_total_likes") || 0);
+let lastMilestone = Math.floor(totalLikes / 10000);
+let lastKnownAbsolute = Number(localStorage.getItem("kyorotan_last_absolute_like_count") || 0);
+
+const fmt = n => Math.max(0, Math.floor(n)).toLocaleString("ja-JP");
+
+function setStatus(text, cls=""){
+  const el = document.getElementById("status");
+  el.textContent = text;
+  el.className = "status " + cls;
+}
+
+function showAchieved(){
+  const a = document.getElementById("achieved");
+  a.classList.remove("show");
+  void a.offsetWidth;
+  a.classList.add("show");
+}
+
+function render(animate=true){
+  totalLikes = Math.max(0, Math.floor(totalLikes));
+  const progress = totalLikes % 10000;
+  document.getElementById("progress").textContent = fmt(progress);
+  document.getElementById("total").textContent = fmt(totalLikes);
+  document.getElementById("bar").style.width = (progress / 10000 * 100) + "%";
+
+  const milestone = Math.floor(totalLikes / 10000);
+  if (animate && milestone > lastMilestone && totalLikes > 0) showAchieved();
+  lastMilestone = milestone;
+
+  localStorage.setItem("kyorotan_auto_total_likes", String(totalLikes));
+}
+
+function numberAt(obj, path){
+  try{
+    let cur = obj;
+    for(const key of path){
+      if(cur == null) return null;
+      cur = cur[key];
+    }
+    const n = Number(cur);
+    return Number.isFinite(n) ? n : null;
+  }catch(e){ return null; }
+}
+
+/* TikFinity versions/configurations can expose slightly different fields.
+   Prefer an absolute stream-like total when present; otherwise use a delta. */
+function extractLikeInfo(payload){
+  const absolutePaths = [
+    ["data","totalLikeCount"],
+    ["data","totalLikes"],
+    ["data","likeTotal"],
+    ["data","roomInfo","likeCount"],
+    ["data","roomInfo","likes"],
+    ["data","stats","likeCount"],
+    ["data","stats","likes"]
+  ];
+  for(const p of absolutePaths){
+    const n = numberAt(payload,p);
+    if(n != null) return {type:"absolute", value:n, path:p.join(".")};
+  }
+
+  const deltaPaths = [
+    ["data","likeCount"],
+    ["data","count"],
+    ["data","repeatCount"],
+    ["data","likes"],
+    ["data","like_count"]
+  ];
+  for(const p of deltaPaths){
+    const n = numberAt(payload,p);
+    if(n != null && n > 0) return {type:"delta", value:n, path:p.join(".")};
+  }
+
+  return null;
+}
+
+function applyLikeEvent(payload){
+  const info = extractLikeInfo(payload);
+  if(!info) return;
+
+  if(info.type === "absolute"){
+    /* If TikFinity reports the live's absolute total, add only the increase
+       since the last event, so our own cumulative counter remains persistent. */
+    if(lastKnownAbsolute === 0){
+      lastKnownAbsolute = info.value;
+      localStorage.setItem("kyorotan_last_absolute_like_count", String(lastKnownAbsolute));
+      return;
+    }
+    const diff = info.value - lastKnownAbsolute;
+    if(diff > 0 && diff < 100000){
+      totalLikes += diff;
+      render(true);
+    }
+    lastKnownAbsolute = info.value;
+    localStorage.setItem("kyorotan_last_absolute_like_count", String(lastKnownAbsolute));
+    return;
+  }
+
+  totalLikes += info.value;
+  render(true);
+}
+
+function connect(){
+  if(websocket) return;
+  setStatus("接続中...");
+
+  websocket = new WebSocket("ws://localhost:21213/");
+
+  websocket.onopen = () => setStatus("TikFinity 接続中", "ok");
+
+  websocket.onclose = () => {
+    setStatus("再接続中...", "bad");
+    websocket = null;
+    setTimeout(connect, 1000);
+  };
+
+  websocket.onerror = () => {
+    setStatus("接続失敗", "bad");
+  };
+
+  websocket.onmessage = event => {
+    let parsedData;
+    try{
+      parsedData = JSON.parse(event.data);
+    }catch(e){
+      return;
+    }
+
+    if(parsedData?.event === "like"){
+      applyLikeEvent(parsedData);
+    }
+  };
+}
+
+/* manual helpers for testing from DevTools */
+window.addLikes = function(n){ totalLikes += Number(n)||0; render(true); };
+window.resetLikes = function(){
+  totalLikes = 0;
+  lastMilestone = 0;
+  lastKnownAbsolute = 0;
+  localStorage.removeItem("kyorotan_auto_total_likes");
+  localStorage.removeItem("kyorotan_last_absolute_like_count");
+  render(false);
+};
+
+render(false);
+window.addEventListener("load", connect);
+</script>
+</body>
+</html>
